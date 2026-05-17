@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm install *)",
+      "Bash(cat C:\\\\\\\\Users\\\\\\\\Lenovo\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\C--Users-Lenovo-otaexpress\\\\\\\\3ddf4113-9ed0-4642-b496-afd9251efd84\\\\\\\\tasks\\\\\\\\bs5k11tcc.output)",
+      "Bash(npx vite *)",
+      "Bash(cat \"C:\\\\\\\\Users\\\\\\\\Lenovo\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\C--Users-Lenovo-otaexpress\\\\\\\\3ddf4113-9ed0-4642-b496-afd9251efd84\\\\\\\\tasks\\\\\\\\bk27bbm2h.output\")"
+    ]
+  }
+}
