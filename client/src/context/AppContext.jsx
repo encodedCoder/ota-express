@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useCallback, useMemo } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react'
 import { storage } from '../utils/storage'
 import { newId } from '../utils/ids'
 import { isToday } from '../utils/format'
+import { api, tokenStore } from '../utils/api'
 
 const Ctx = createContext(null)
 
@@ -22,6 +23,20 @@ export function AppProvider({ children }) {
   const [purchases,  setPurchasesRaw]  = useState(() => storage.get(KEYS.purchases, []))
   const [payments,   setPaymentsRaw]   = useState(() => storage.get(KEYS.payments,  []))
   const [priceItems, setPriceItemsRaw] = useState(() => storage.get(todayPriceKey(), []))
+
+  // On mount, fetch today's price list from Supabase and merge into state
+  useEffect(() => {
+    if (!tokenStore.get()) return
+    api('/price-list', { auth: true })
+      .then(data => {
+        if (data?.items?.length) {
+          const key = todayPriceKey()
+          storage.set(key, data.items)
+          setPriceItemsRaw(data.items)
+        }
+      })
+      .catch(() => { /* silently fall back to localStorage */ })
+  }, [])
 
   const makeSetter = (key, rawSetter) => (updater) =>
     rawSetter(prev => {
@@ -88,6 +103,8 @@ export function AppProvider({ children }) {
       storage.set(key, next)
       return next
     })
+    // Sync to Supabase in the background
+    api('/price-list', { method: 'POST', auth: true, body: item }).catch(() => {})
   }, [])
 
   const removePriceItem = useCallback((id) => {
@@ -97,6 +114,8 @@ export function AppProvider({ children }) {
       storage.set(key, next)
       return next
     })
+    // Sync removal to Supabase in the background
+    api(`/price-list/${id}`, { method: 'DELETE', auth: true }).catch(() => {})
   }, [])
 
   // ── Payments ─────────────────────────────────────────────

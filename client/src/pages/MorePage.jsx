@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
+import { useAuth } from "../context/AuthContext";
 import { CAD, fmtDate, fmtTime } from "../utils/format";
 import BottomSheet from "../components/BottomSheet";
 import { newId } from "../utils/ids";
@@ -15,8 +16,6 @@ const emptyItem = () => ({
 
 export default function MorePage() {
   const {
-    settings,
-    setSettings,
     purchases,
     addPurchase,
     markPurchasePaid,
@@ -24,19 +23,18 @@ export default function MorePage() {
     sales,
     payments,
   } = useApp();
+  const { user, profile, updateProfile, logout } = useAuth();
 
   const [tab, setTab] = useState("purchases");
   const [nameEdit, setNameEdit] = useState(false);
-  const [vendorInput, setVendorInput] = useState(settings.vendorName);
-  const [waModeInput, setWaModeInput] = useState(
-    settings.whatsappMode || "personal",
+  const [vendorInput, setVendorInput] = useState(profile?.vendor_name || '');
+  const [bizEdit, setBizEdit] = useState(false);
+  const [bizInput, setBizInput] = useState(profile?.business_name || '');
+  const [taxEdit, setTaxEdit] = useState(false);
+  const [taxInput, setTaxInput] = useState(
+    profile ? String(Math.round((profile.tax_rate ?? 0.13) * 100)) : '13'
   );
-  const [waApiUrlInput, setWaApiUrlInput] = useState(
-    settings.whatsappApiUrl || "",
-  );
-  const [waApiTokenInput, setWaApiTokenInput] = useState(
-    settings.whatsappApiToken || "",
-  );
+  const [savingProfile, setSavingProfile] = useState(false);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [histTab, setHistTab] = useState("all");
 
@@ -77,21 +75,28 @@ export default function MorePage() {
     setPurchaseOpen(false);
   };
 
-  const handleSaveName = () => {
-    setSettings({
-      ...settings,
-      vendorName: vendorInput.trim() || settings.vendorName,
-    });
+  const handleSaveName = async () => {
+    if (!vendorInput.trim()) return;
+    setSavingProfile(true);
+    await updateProfile({ vendor_name: vendorInput.trim() }).catch(() => {});
+    setSavingProfile(false);
     setNameEdit(false);
   };
 
-  const handleSaveWhatsApp = () => {
-    setSettings({
-      ...settings,
-      whatsappMode: waModeInput,
-      whatsappApiUrl: waApiUrlInput.trim(),
-      whatsappApiToken: waApiTokenInput.trim(),
-    });
+  const handleSaveBiz = async () => {
+    setSavingProfile(true);
+    await updateProfile({ business_name: bizInput.trim() }).catch(() => {});
+    setSavingProfile(false);
+    setBizEdit(false);
+  };
+
+  const handleSaveTax = async () => {
+    const rate = parseFloat(taxInput) / 100;
+    if (isNaN(rate) || rate < 0 || rate > 1) return;
+    setSavingProfile(true);
+    await updateProfile({ tax_rate: rate }).catch(() => {});
+    setSavingProfile(false);
+    setTaxEdit(false);
   };
 
   // history
@@ -117,6 +122,8 @@ export default function MorePage() {
         <div className="more-section">
           <p className="more-section-title">Settings</p>
           <div className="settings-card">
+
+            {/* Vendor Name */}
             <div className="settings-row">
               <div>
                 <p className="settings-label">Vendor name</p>
@@ -132,83 +139,144 @@ export default function MorePage() {
                     <button
                       className="btn btn--sm btn--primary"
                       onClick={handleSaveName}
+                      disabled={savingProfile}
                     >
-                      Save
+                      {savingProfile ? "Saving…" : "Save"}
                     </button>
                     <button
                       className="btn btn--sm btn--ghost"
                       onClick={() => {
                         setNameEdit(false);
-                        setVendorInput(settings.vendorName);
+                        setVendorInput(profile?.vendor_name || '');
                       }}
                     >
                       Cancel
                     </button>
                   </div>
                 ) : (
-                  <p className="settings-value">{settings.vendorName}</p>
+                  <p className="settings-value">{profile?.vendor_name || '—'}</p>
                 )}
               </div>
               {!nameEdit && (
                 <button
                   className="btn btn--sm btn--outline"
-                  onClick={() => setNameEdit(true)}
+                  onClick={() => { setVendorInput(profile?.vendor_name || ''); setNameEdit(true); }}
                 >
                   Edit
                 </button>
               )}
             </div>
 
-            <div className="settings-stack">
-              <p className="settings-label">WhatsApp send mode</p>
-              <select
-                className="form-select"
-                value={waModeInput}
-                onChange={(e) => setWaModeInput(e.target.value)}
-              >
-                <option value="personal">
-                  Personal WhatsApp (current device)
-                </option>
-                <option value="business-api">Verified Business API</option>
-              </select>
-              <p className="settings-help">
-                Use Business API mode to send from your verified business
-                number.
-              </p>
+            {/* Business Name */}
+            <div className="settings-row">
+              <div>
+                <p className="settings-label">Business name</p>
+                <p className="settings-help" style={{ marginBottom: 2 }}>Shown in the bill header sent to customers</p>
+                {bizEdit ? (
+                  <div className="settings-edit-row">
+                    <input
+                      className="form-input settings-name-input"
+                      value={bizInput}
+                      placeholder="e.g. Suresh Fruit Seller"
+                      onChange={(e) => setBizInput(e.target.value)}
+                      autoFocus
+                      onKeyDown={(e) => e.key === "Enter" && handleSaveBiz()}
+                    />
+                    <button
+                      className="btn btn--sm btn--primary"
+                      onClick={handleSaveBiz}
+                      disabled={savingProfile}
+                    >
+                      {savingProfile ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      className="btn btn--sm btn--ghost"
+                      onClick={() => { setBizEdit(false); setBizInput(profile?.business_name || ''); }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <p className="settings-value">{profile?.business_name || <span style={{ color: 'var(--text-2)', fontStyle: 'italic' }}>Not set</span>}</p>
+                )}
+              </div>
+              {!bizEdit && (
+                <button
+                  className="btn btn--sm btn--outline"
+                  onClick={() => { setBizInput(profile?.business_name || ''); setBizEdit(true); }}
+                >
+                  Edit
+                </button>
+              )}
             </div>
 
-            {waModeInput === "business-api" && (
-              <>
-                <div className="settings-stack">
-                  <p className="settings-label">Business API endpoint</p>
-                  <input
-                    className="form-input"
-                    placeholder="https://your-server.com/api/whatsapp/todays-prices"
-                    value={waApiUrlInput}
-                    onChange={(e) => setWaApiUrlInput(e.target.value)}
-                  />
-                </div>
-                <div className="settings-stack">
-                  <p className="settings-label">
-                    API bearer token{" "}
-                    <span className="form-label-opt">(optional)</span>
+            {/* Tax Rate */}
+            <div className="settings-row">
+              <div>
+                <p className="settings-label">Tax rate (HST/GST)</p>
+                {taxEdit ? (
+                  <div className="settings-edit-row">
+                    <input
+                      className="form-input settings-name-input"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      max="100"
+                      value={taxInput}
+                      onChange={(e) => setTaxInput(e.target.value)}
+                      autoFocus
+                      onKeyDown={(e) => e.key === "Enter" && handleSaveTax()}
+                    />
+                    <span style={{ fontSize: 14, alignSelf: 'center' }}>%</span>
+                    <button
+                      className="btn btn--sm btn--primary"
+                      onClick={handleSaveTax}
+                      disabled={savingProfile}
+                    >
+                      {savingProfile ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      className="btn btn--sm btn--ghost"
+                      onClick={() => setTaxEdit(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <p className="settings-value">
+                    {profile ? `${Math.round((profile.tax_rate ?? 0.13) * 100)}%` : '13%'}
                   </p>
-                  <input
-                    className="form-input"
-                    placeholder="Optional token"
-                    value={waApiTokenInput}
-                    onChange={(e) => setWaApiTokenInput(e.target.value)}
-                  />
-                </div>
-              </>
-            )}
+                )}
+              </div>
+              {!taxEdit && (
+                <button
+                  className="btn btn--sm btn--outline"
+                  onClick={() => {
+                    setTaxInput(profile ? String(Math.round((profile.tax_rate ?? 0.13) * 100)) : '13');
+                    setTaxEdit(true);
+                  }}
+                >
+                  Edit
+                </button>
+              )}
+            </div>
 
-            <button
-              className="btn btn--sm btn--primary"
-              onClick={handleSaveWhatsApp}
-            >
-              Save WhatsApp Settings
-            </button>
+            {user && (
+              <div className="logout-row">
+                <div className="logout-info">
+                  <span className="logout-label">Signed in as</span>
+                  <span className="logout-phone">{user.phone}</span>
+                </div>
+                <button
+                  className="btn btn--sm btn--danger-ghost"
+                  onClick={() => {
+                    if (window.confirm("Sign out of OtaExpress?")) logout();
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
